@@ -1,0 +1,39 @@
+name:                 fisher-accelerate
+version:              0.1.0.0
+-- synopsis:
+-- description:
+-- homepage:             https://github.com/tmcdonell/fischer-accelerate#readme
+license:              BSD3
+license-file:         LICENSE
+author:               Trevor L. McDonell
+maintainer:           Trevor L. McDonell <tmcdonell@cse.unsw.edu.au>
+copyright:            BSD3
+category:             Web
+build-type:           Simple
+extra-source-files:   README.md
+cabal-version:        >=1.10
+
+executable fisher-accelerate
+  default-language:   Haskell2010
+  hs-source-dirs:     src
+
+  main-is:            Main.hs
+
+  other-modules:
+      Solve
+      Type
+
+  ghc-options:
+      -O2
+      -threaded
+      -rtsopts
+
+  build-depends:
+      base                        >= 4.7 && < 5
+    , accelerate                  == 1.1.*
+    , accelerate-llvm-native
+    , accelerate-llvm-ptx
+    , lens-accelerate
+    , time
+
+-- vim: nospell
