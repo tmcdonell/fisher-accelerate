@@ -12,10 +12,13 @@
 
 module Solve where
 
-import Type
-
 import Data.Array.Accelerate
 import Data.Array.Accelerate.Control.Lens
+
+
+-- Useful type synonyms
+type R        = Double
+type Field e  = Array DIM2 e
 
 
 -- | Take a single time step

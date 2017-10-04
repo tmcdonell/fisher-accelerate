@@ -7,7 +7,6 @@
 
 module Main where
 
-import Type
 import Solve
 
 import Data.Array.Accelerate                                        as A
