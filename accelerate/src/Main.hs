@@ -1,5 +1,7 @@
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
+{-# OPTIONS_GHC -fplugin=Data.Array.Accelerate.LLVM.Native.Plugin #-}
 
 -- A small program which solves the 2D Fisher equation using second-order finite
 -- differences.
@@ -48,7 +50,7 @@ main = do
       x0      = run $ initialise nx ny
 
       -- compile the main loop
-      step'   = runN step
+      step'   = $( runQ step )
 
       -- the main loop
       go i x
