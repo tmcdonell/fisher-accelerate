@@ -21,7 +21,6 @@ executable fisher-accelerate
 
   other-modules:
       Solve
-      Type
 
   ghc-options:
       -O2
