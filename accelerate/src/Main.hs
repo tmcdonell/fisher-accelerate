@@ -12,18 +12,20 @@ module Main where
 import Solve
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Debug                                  ( showFFloatSIBase )
 import Data.Array.Accelerate.Array.Data                             ( ptrsOfArrayData )
 import Data.Array.Accelerate.Array.Sugar                            ( Array(..) )
+import Data.Array.Accelerate.Debug                                  ( showFFloatSIBase )
+import qualified Data.Array.Accelerate.Debug                        as Debug
 
 import Data.Array.Accelerate.LLVM.Native                            as CPU
 -- import Data.Array.Accelerate.LLVM.PTX                               as PTX
 
-import Control.Monad
 import Control.Exception
+import Control.Monad
 import Data.Time.Clock
 import Foreign.Storable
 import System.CPUTime
+import System.Environment
 import System.IO
 import Text.Printf
 import Prelude                                                      as P
@@ -33,13 +35,18 @@ import Prelude                                                      as P
 --
 main :: IO ()
 main = do
+  argv <- getArgs
+
   let
-      -- TODO: read simulation parameters from command line instead
-      nx      = 256
-      ny      = 256
-      dx      = 1 / (P.fromIntegral nx - 1) :: R
-      tend    = 0.01                        :: R
-      steps   = 100                         :: Int
+      dx                    = 1 / (P.fromIntegral nx - 1) :: R
+      (nx, ny, steps, tend) =
+        case argv of
+          [a,b,c,d]
+            | [(a',[])] <- reads a
+            , [(b',[])] <- reads b
+            , [(c',[])] <- reads c
+            , [(d',[])] <- reads d -> (a',b',c',d')
+          _                        -> usage
 
       -- compute timestep
       dt :: Scalar R
@@ -50,7 +57,7 @@ main = do
       x0      = run $ initialise nx ny
 
       -- compile the main loop
-      step'   = $( runQ step )
+      step'   = runN step
 
       -- the main loop
       go i x
@@ -60,13 +67,23 @@ main = do
             in if indexArray ok Z
                  then go (i+1) x'
                  else error (printf "step %d error: non-linear iterations failed to converge" i)
-  --
+
+  -- Start EKG monitor
+  Debug.beginMonitoring
+
+  -- For your convenience, you can also set some debug flags here
+  -- Debug.setFlags [ Debug.dump_phases ]
+
+  -- Show the welcome banner
+  nx `seq` ny `seq` steps `seq` tend `seq` return ()
   printf "========================================================================\n"
   printf "                      Welcome to mini-stencil!\n"
   printf "mesh :: %d * %d, dx = %.4f\n" nx ny dx
   printf "time :: %d, time steps from 0 .. %f\n" steps tend
   printf "========================================================================\n"
-  --
+
+  -- Run the simulation and store the result
+  -- You can open the 'output.bov' file in a program like VisIt
   r   <- elapsed (evaluate (go 0 x0))
   writeBOV steps tend r
 
@@ -122,6 +139,21 @@ writeBOV _ t arr@(Array _ adata) = do
   withFile outdata WriteMode $ \h ->
     hPutBuf h (ptrsOfArrayData adata) (arraySize (arrayShape arr) * sizeOf (undefined::R))
 
+
+usage :: a
+usage = error $ unlines
+  [ "fisher-accelerate"
+  , ""
+  , "Usage: fisher-accelerate nx ny s t"
+  , "  nx   number of grid points in the x-direction"
+  , "  ny   number of grid points in the y-direction"
+  , "  s    number of simulation steps"
+  , "  t    total simulation time"
+  , ""
+  , "Example parameters:"
+  , "  128 128 100 0.0025"
+  , "  256 256 100 0.01"
+  ]
 
 elapsed :: IO a -> IO a
 elapsed action = do
