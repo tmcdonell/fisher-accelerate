@@ -43,14 +43,18 @@ extra-deps:
 - accelerate-1.1.1.0
 - accelerate-llvm-1.1.0.0
 - accelerate-llvm-native-1.1.0.1
+- accelerate-llvm-ptx-1.1.0.0
 
 # Override default flag values for local packages and extra-deps
 flags:
   accelerate:
     debug: true
+    ekg: true
   accelerate-llvm:
     debug: true
   accelerate-llvm-native:
+    debug: true
+  accelerate-llvm-ptx:
     debug: true
 
 # Extra package databases containing global packages
