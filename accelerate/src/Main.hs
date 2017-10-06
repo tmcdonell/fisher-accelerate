@@ -1,7 +1,5 @@
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell  #-}
-{-# OPTIONS_GHC -fplugin=Data.Array.Accelerate.LLVM.Native.Plugin #-}
 
 -- A small program which solves the 2D Fisher equation using second-order finite
 -- differences.
@@ -9,16 +7,23 @@
 
 module Main where
 
+-- Accelerate supports multiple backends. Change the input here to switch which
+-- backend to use.
+--
+-- import Data.Array.Accelerate.LLVM.Native                            as CPU
+import Data.Array.Accelerate.LLVM.PTX                               as PTX
+
+-- For the exercise, you will need to implement functions in this module.
+--
 import Solve
 
+
+-- Other imports for this module
 import Data.Array.Accelerate                                        as A
 import Data.Array.Accelerate.Array.Data                             ( ptrsOfArrayData )
 import Data.Array.Accelerate.Array.Sugar                            ( Array(..) )
 import Data.Array.Accelerate.Debug                                  ( showFFloatSIBase )
 import qualified Data.Array.Accelerate.Debug                        as Debug
-
-import Data.Array.Accelerate.LLVM.Native                            as CPU
--- import Data.Array.Accelerate.LLVM.PTX                               as PTX
 
 import Control.Exception
 import Control.Monad
@@ -35,6 +40,16 @@ import Prelude                                                      as P
 --
 main :: IO ()
 main = do
+  -- This will strip out the "+ACC ... -ACC" from the command line arguments,
+  -- which makes handling the input parameters a bit simpler. Alternatively,
+  -- they can be specified using the ACCELERATE_FLAGS environment variable.
+  --
+  -- You may want to turn on a few of the debugging options to get some more
+  -- information about what the compiler is doing.
+  --
+  Debug.accInit
+
+  -- The command line arguments, stripped of Accelerate RTS options
   argv <- getArgs
 
   let
@@ -48,44 +63,53 @@ main = do
             , [(d',[])] <- reads d -> (a',b',c',d')
           _                        -> usage
 
-      -- compute timestep
+      -- The simulation timestep
+      --
+      -- This is put into a Scalar (single element) array so that our main loop
+      -- can be put into the form of a function from arrays to arrays; i.e.
+      -- (Acc a -> Acc b -> ... Acc c).
+      --
       dt :: Scalar R
-      dt      = fromList Z [tend / P.fromIntegral steps]
+      dt = fromList Z [tend / P.fromIntegral steps]
 
-      -- initial conditions
+      -- Generate the initial conditions
+      --
       x0 :: Field R
-      x0      = run $ initialise nx ny
+      x0 = run $ initialise nx ny
 
-      -- compile the main loop
-      step'   = runN step
-
-      -- the main loop
+      -- Compile and run the main loop
+      --
+      -- There are different ways that this could be done. Experiment a bit
+      -- here...
+      --
       go i x
         | i P.>= steps  = x
         | otherwise     =
-            let (ok, x') = step' dt x
+            let (ok, x') = run $ step (use dt) (use x)
             in if indexArray ok Z
                  then go (i+1) x'
                  else error (printf "step %d error: non-linear iterations failed to converge" i)
 
   -- Start EKG monitor
+  --
   Debug.beginMonitoring
 
-  -- For your convenience, you can also set some debug flags here
-  -- Debug.setFlags [ Debug.dump_phases ]
-
   -- Show the welcome banner
-  nx `seq` ny `seq` steps `seq` tend `seq` return ()
+  --
+  nx `seq` ny `seq` steps `seq` tend `seq` return ()  -- if there are errors, get them early
   printf "========================================================================\n"
   printf "                      Welcome to mini-stencil!\n"
   printf "mesh :: %d * %d, dx = %.4f\n" nx ny dx
   printf "time :: %d, time steps from 0 .. %f\n" steps tend
   printf "========================================================================\n"
 
-  -- Run the simulation and store the result
-  -- You can open the 'output.bov' file in a program like VisIt
+  -- Run the simulation and store the final timestep result to file. You can
+  -- open the 'output.bov' file in a program like VisIt to check that it looks
+  -- right.
+  --
   r   <- elapsed (evaluate (go 0 x0))
   writeBOV steps tend r
+
 
 
 -- Set the initial conditions: a circle of concentration of 0.1 centred at
@@ -113,7 +137,10 @@ initialise xdim ydim =
 
 
 -- Save the result of the given simulation step to file for later visualisation.
--- The file can be opened with the VisIt program.
+-- The file can be opened with the VisIt program. The script 'tools/phi.py' can
+-- be used to generate the picture (via VisIt) as well.
+--
+-- https://wci.llnl.gov/simulation/computer-codes/visit
 --
 writeBOV :: Int -> R -> Field R -> IO ()
 writeBOV _ t arr@(Array _ adata) = do
@@ -166,7 +193,7 @@ elapsed action = do
   let wallTime = realToFrac (diffUTCTime wall1 wall0)
       cpuTime  = P.fromIntegral (cpu1 - cpu0) * 1E-12
   --
-  printf "%s (wall), %s (cpu), %.2f x speedup\n"
+  printf "Simulation took %s (wall), %s (cpu), %.2f x speedup\n"
     (showFFloatSIBase (Just 3) 1000 wallTime "s")
     (showFFloatSIBase (Just 3) 1000 cpuTime  "s")
     (cpuTime / wallTime :: Double)

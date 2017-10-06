@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: nightly-2017-09-26
+resolver: nightly-2017-10-05
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -39,6 +39,11 @@ packages:
 - .
 
 # Dependency packages to be pulled from upstream that are not in the resolver
+#
+# We need to add the Accelerate packages here because we use custom build flags
+# below, otherwise this would not be necessary (we get them straight from the
+# stackage resolver).
+#
 extra-deps:
 - accelerate-1.1.1.0
 - accelerate-llvm-1.1.0.0
